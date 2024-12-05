@@ -35,8 +35,35 @@ def tile(input: Tensor, kernel: Tuple[int, int]) -> Tuple[Tensor, int, int]:
     kh, kw = kernel
     assert height % kh == 0
     assert width % kw == 0
-    # TODO: Implement for Task 4.3.
-    raise NotImplementedError("Need to implement for Task 4.3")
+
+    # Calculate new dimensions
+    new_height = height // kh
+    new_width = width // kw
+
+    # Reshape and permute to group pooling regions
+    # Use view to reshape without permute
+    tiled = input.contiguous().view(batch, channel, new_height, kh, new_width, kw)
+    tiled = tiled.permute(0, 1, 2, 3, 4, 5).contiguous()
+    tiled = tiled.view(batch, channel, new_height, new_width, kh * kw)
+    return tiled, new_height, new_width
 
 
-# TODO: Implement for Task 4.3.
+def avgpool2d(input: Tensor, kernel: Tuple[int, int]) -> Tensor:
+    """Perform 2D average pooling on the input tensor with a given kernel size.
+
+    Args:
+    ----
+        input: batch x channel x height x width
+        kernel: height x width of pooling
+
+    Returns:
+    -------
+        Tensor of size batch x channel x new_height x new_width
+
+    """
+    batch, channel = input.shape[:2]
+    tiled, new_height, new_width = tile(input, kernel)
+    pooled = tiled.mean(dim=4)
+    return pooled.view(batch, channel, new_height, new_width)
+
+
