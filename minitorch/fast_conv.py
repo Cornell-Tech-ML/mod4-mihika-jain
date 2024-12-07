@@ -1,14 +1,10 @@
 from typing import Tuple, TypeVar, Any
 
-import numpy as np
-from numba import prange
 from numba import njit as _njit
 
 from .autodiff import Context
 from .tensor import Tensor
 from .tensor_data import (
-    MAX_DIMS,
-    Index,
     Shape,
     Strides,
     Storage,
@@ -22,6 +18,22 @@ Fn = TypeVar("Fn")
 
 
 def njit(fn: Fn, **kwargs: Any) -> Fn:
+    """A wrapper function for Numba's njit decorator with inline optimization.
+
+    This function applies Numba's njit decorator to the given function with the
+    inline optimization set to "always". Additional keyword arguments can be
+    passed to customize the behavior of the njit decorator.
+
+    Args:
+    ----
+        fn (Fn): The function to be JIT compiled.
+        **kwargs (Any): Additional keyword arguments to pass to the njit decorator.
+
+    Returns:
+    -------
+        Fn: The JIT compiled function.
+
+    """
     return _njit(inline="always", **kwargs)(fn)  # type: ignore
 
 
@@ -90,7 +102,7 @@ def _tensor_conv1d(
     # s1 = input_strides
     # s2 = weight_strides
 
-        # Iterate through the batch
+    # Iterate through the batch
     for b in range(batch):
         for oc in range(out_channels):
             for ow in range(out_width):
@@ -99,13 +111,21 @@ def _tensor_conv1d(
                 for ic in range(in_channels):
                     for kw_idx in range(kw):
                         iw = ow + kw_idx if not reverse else ow - kw_idx
-                        
+
                         # Ensure index is within bounds of input width
                         if 0 <= iw < width:
-                            input_idx = b * input_strides[0] + ic * input_strides[1] + iw * input_strides[2]
-                            weight_idx = oc * weight_strides[0] + ic * weight_strides[1] + kw_idx * weight_strides[2]
+                            input_idx = (
+                                b * input_strides[0]
+                                + ic * input_strides[1]
+                                + iw * input_strides[2]
+                            )
+                            weight_idx = (
+                                oc * weight_strides[0]
+                                + ic * weight_strides[1]
+                                + kw_idx * weight_strides[2]
+                            )
                             acc += input[input_idx] * weight[weight_idx]
-                
+
                 # Write the accumulated value to the output tensor
                 out_idx = b * out_strides[0] + oc * out_strides[1] + ow * out_strides[2]
                 out[out_idx] = acc
@@ -244,20 +264,20 @@ def _tensor_conv2d(
 
     # s1 = input_strides
     # s2 = weight_strides
-    
+
     # inners
     # s10, s11, s12, s13 = s1[0], s1[1], s1[2], s1[3]
     # s20, s21, s22, s23 = s2[0], s2[1], s2[2], s2[3]
 
     # Iterate over the output tensor dimensions
-    for b in range(batch):  
-        for oc in range(out_channels):  
-            for oh in range(out_height):  
-                for ow in range(out_width):  
+    for b in range(batch):
+        for oc in range(out_channels):
+            for oh in range(out_height):
+                for ow in range(out_width):
                     value = 0.0
-                    for ic in range(in_channels):  
-                        for kh_idx in range(kh):  
-                            for kw_idx in range(kw):  
+                    for ic in range(in_channels):
+                        for kh_idx in range(kh):
+                            for kw_idx in range(kw):
                                 # Calculate the input indices
                                 ih = oh + kh_idx if not reverse else oh - kh_idx
                                 iw = ow + kw_idx if not reverse else ow - kw_idx
@@ -286,6 +306,7 @@ def _tensor_conv2d(
                         + ow * out_strides[3]
                     )
                     out[out_index] = value
+
 
 tensor_conv2d = njit(_tensor_conv2d, parallel=True, fastmath=True)
 

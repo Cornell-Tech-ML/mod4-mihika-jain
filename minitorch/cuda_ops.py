@@ -424,16 +424,15 @@ def tensor_reduce(
                 in_a = index_to_position(out_index, a_strides)
                 cache[pos] = a_storage[in_a]
                 cuda.syncthreads()
-                x = 0 
+                x = 0
                 while 2**x < BLOCK_DIM:
                     j = 2**x
-                    if pos % (j*2) == 0:
+                    if pos % (j * 2) == 0:
                         cache[pos] = fn(cache[pos], cache[pos + j])
                         cuda.syncthreads()
-                    x+=1
-            if pos == 0: 
+                    x += 1
+            if pos == 0:
                 out[o] = cache[0]
-
 
     return jit(_reduce)  # type: ignore
 
@@ -563,21 +562,19 @@ def _tensor_matrix_multiply(
     i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
     j = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
 
-    # The local position in the block.
+    # The local position in the block.s
     pi = cuda.threadIdx.x
     pj = cuda.threadIdx.y
 
-    k_size = a_shape[-1]
+    accum = 0.0
 
-    accum = 0.0 
-
-    for k_start in range(0,a_shape[2], BLOCK_DIM):
+    for k_start in range(0, a_shape[2], BLOCK_DIM):
         k = k_start + pj
-        if i <a_shape[1] and k < a_shape[2]:
+        if i < a_shape[1] and k < a_shape[2]:
             a_shared[pi, pj] = a_storage[
                 a_batch_stride * batch + a_strides[1] * i + a_strides[2] * k
             ]
-        k = k_start + pi 
+        k = k_start + pi
         if j < b_shape[2] and k < b_shape[1]:
             b_shared[pi, pj] = b_storage[
                 b_batch_stride * batch + b_strides[1] * k + b_strides[2] * j
@@ -585,10 +582,11 @@ def _tensor_matrix_multiply(
         cuda.syncthreads()
 
         for k in range(BLOCK_DIM):
-            if(k_start+k) < a_shape[2]:
+            if (k_start + k) < a_shape[2]:
                 accum += a_shared[pi, k] * b_shared[k, pj]
 
     if i < out_shape[1] and j < out_shape[2]:
         out[out_strides[0] * batch + out_strides[1] * i + out_strides[2] * j] = accum
+
 
 tensor_matrix_multiply = jit(_tensor_matrix_multiply)
