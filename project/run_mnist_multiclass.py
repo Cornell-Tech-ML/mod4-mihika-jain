@@ -6,13 +6,11 @@ mndata = MNIST("project/data/")
 images, labels = mndata.load_training()
 
 BACKEND = minitorch.TensorBackend(minitorch.FastOps)
-BATCH = 16
-
-# Number of classes (10 digits)
-C = 10
 
 # Size of images (height and width)
 H, W = 28, 28
+BATCH = 16
+C = 10
 
 
 def RParam(*shape):
@@ -41,10 +39,9 @@ class Conv2d(minitorch.Module):
         self.bias = RParam(out_channels, 1, 1)
 
     def forward(self, input):
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
-
-
+        output = minitorch.Conv2dFun.apply(input, self.weights.value)
+        # Add bias
+        return output + self.bias.value
 class Network(minitorch.Module):
     """
     Implement a CNN for MNist classification based on LeNet.
@@ -62,17 +59,30 @@ class Network(minitorch.Module):
 
     def __init__(self):
         super().__init__()
-
         # For vis
         self.mid = None
         self.out = None
 
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # Define layers
+        self.conv1 = Conv2d(1, 4, 3, 3)
+        self.conv2 = Conv2d(4, 8, 3, 3)
+        self.linear1 = Linear(392, 64)
+        self.linear2 = Linear(64, 10)
+        self.dropout = 0.25
+
+        # 10 is the number of class (e.g. digits)
+        self.linear2 = Linear(64, 10)
 
     def forward(self, x):
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        self.mid = self.conv1.forward(x).relu()
+        self.out = self.conv2.forward(self.mid).relu()
+        pooled = minitorch.avgpool2d(self.out, (4, 4))
+        temp = self.linear1.forward(
+            pooled.view(pooled.shape[0], 392)
+        )
+        temp = minitorch.dropout(temp, 0.25, self.eval)
+        temp = self.linear2.forward(temp)
+        return minitorch.logsoftmax(temp, dim=1)
 
 
 def make_mnist(start, stop):
@@ -88,7 +98,10 @@ def make_mnist(start, stop):
 
 
 def default_log_fn(epoch, total_loss, correct, total, losses, model):
-    print(f"Epoch {epoch} loss {total_loss} valid acc {correct}/{total}")
+    log_message = f"Epoch {epoch} loss {total_loss} valid acc {correct}/{total}\n"
+    print(log_message)
+    with open("mnist.txt", "a") as f:
+        f.write(log_message)
 
 
 class ImageTrain:
